@@ -198,6 +198,22 @@ public class ShaderClass(Identifier name, TextLocation info) : ShaderDeclaration
         }
 
         var symbols = new List<Symbol>();
+
+        if (Generics != null)
+        {
+            foreach (var genericParameter in Generics.Parameters)
+            {
+                var genericParameterType = genericParameter.TypeName.ResolveType(table);
+                table.DeclaredTypes.TryAdd(genericParameterType.ToString(), genericParameterType);
+
+                var genericParameterTypeId = context.GetOrRegister(genericParameterType);
+                context.Add(new OpSDSLGenericParameter(context.Bound, genericParameterTypeId));
+                context.AddName(context.Bound, genericParameter.Name);
+                table.CurrentFrame.Add(genericParameter.Name, new(new(genericParameter.Name, SymbolKind.ConstantGeneric), genericParameterType, context.Bound));
+                context.Bound++;
+            }
+        }
+
         foreach (var member in Elements)
         {
             if (member is ShaderMethod func)

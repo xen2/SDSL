@@ -1271,6 +1271,102 @@ public struct OpSDSLMixinCompose : IMemoryInstruction
     public static implicit operator OpSDSLMixinCompose(OpDataIndex odi) => new(odi);
 }
 
+public struct OpSDSLGenericParameter : IMemoryInstruction
+{
+    public OpDataIndex? DataIndex { get; set; }
+
+    public MemoryOwner<int> InstructionMemory
+    {
+        readonly get
+        {
+            if (DataIndex is OpDataIndex odi)
+                return odi.Data.Memory;
+            else
+                return field;
+        }
+
+        private set
+        {
+            if (DataIndex is OpDataIndex odi)
+            {
+                odi.Data.Memory.Dispose();
+                odi.Data.Memory = value;
+            }
+            else
+                field = value;
+        }
+    }
+
+    public OpSDSLGenericParameter()
+    {
+        InstructionMemory = MemoryOwner<int>.Allocate(1);
+        InstructionMemory.Span[0] = (int)Op.OpSDSLGenericParameter | (1 << 16);
+    }
+
+    public static implicit operator Id(OpSDSLGenericParameter inst) => new Id(inst.ResultId);
+    public static implicit operator int (OpSDSLGenericParameter inst) => inst.ResultId;
+    public int ResultType
+    {
+        get;
+        set
+        {
+            field = value;
+            if (InstructionMemory is not null)
+                UpdateInstructionMemory();
+        }
+    }
+
+    public int ResultId
+    {
+        get;
+        set
+        {
+            field = value;
+            if (InstructionMemory is not null)
+                UpdateInstructionMemory();
+        }
+    }
+
+    public OpSDSLGenericParameter(OpDataIndex index)
+    {
+        foreach (var o in index.Data)
+        {
+            if (o.Name == "resultType")
+                ResultType = o.ToLiteral<int>();
+            else if (o.Name == "resultId")
+                ResultId = o.ToLiteral<int>();
+        }
+
+        DataIndex = index;
+    }
+
+    public OpSDSLGenericParameter(int resultType, int resultId)
+    {
+        ResultType = resultType;
+        ResultId = resultId;
+        UpdateInstructionMemory();
+    }
+
+    public void UpdateInstructionMemory()
+    {
+        if (InstructionMemory is null)
+            InstructionMemory = MemoryOwner<int>.Empty;
+        Span<int> instruction = [(int)Op.OpSDSLGenericParameter, ResultType, ResultId];
+        instruction[0] |= instruction.Length << 16;
+        if (instruction.Length == InstructionMemory.Length)
+            instruction.CopyTo(InstructionMemory.Span);
+        else
+        {
+            var tmp = MemoryOwner<int>.Allocate(instruction.Length);
+            instruction.CopyTo(tmp.Span);
+            InstructionMemory?.Dispose();
+            InstructionMemory = tmp;
+        }
+    }
+
+    public static implicit operator OpSDSLGenericParameter(OpDataIndex odi) => new(odi);
+}
+
 public struct OpNop : IMemoryInstruction
 {
     public OpDataIndex? DataIndex { get; set; }
