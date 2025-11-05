@@ -138,6 +138,7 @@ public class BoolLiteral(bool value, TextLocation info) : ScalarLiteral(info)
 public abstract class CompositeLiteral(TextLocation info) : ValueLiteral(info)
 {
     public List<Expression> Values { get; set; } = [];
+    public abstract SymbolType ElementType { get; }
 
     public bool IsConstant()
     {
@@ -151,13 +152,34 @@ public abstract class CompositeLiteral(TextLocation info) : ValueLiteral(info)
 
     public override SpirvValue Compile(SymbolTable table, ShaderClass shader, CompilerUnit compiler)
     {
+        Type = GenerateType(table);
+
         var (builder, context) = compiler;
         Span<int> values = stackalloc int[Values.Count];
         int tmp = 0;
         foreach (var v in Values)
+        {
             values[tmp++] = v.Compile(table, shader, compiler).Id;
 
-        Type = GenerateType(table);
+            switch (v.Type)
+            {
+                case ScalarType st when ElementType == st || (st.IsInteger() && ElementType.IsFloating()):
+                case VectorType vt when vt.BaseType == ElementType && Type is VectorType vt2 && vt.Size > vt2.Size:
+                    break;
+                default:
+                    table.Errors.Add(new(v.Info, SDSLErrorMessages.SDSL0106));
+                    break;
+            }
+
+            if (ElementType.IsFloating())
+            {
+                if (v.ValueType.IsSignedInteger())
+                    values[tmp - 1] = builder.Insert(new OpConvertSToF(compiler.Context.GetOrRegister(ElementType), context.Bound++, values[tmp - 1])).ResultId;
+                else if (v.ValueType.IsUnsignedInteger())
+                    values[tmp - 1] = builder.Insert(new OpConvertUToF(compiler.Context.GetOrRegister(ElementType), context.Bound++, values[tmp - 1])).ResultId;
+            }
+
+        }
 
         return builder.CompositeConstruct(context, this, [.. values]);
     }
@@ -166,22 +188,11 @@ public class VectorLiteral(TypeName typeName, TextLocation info) : CompositeLite
 {
     public TypeName TypeName { get; set; } = typeName;
 
+    public override SymbolType ElementType => ((VectorType)Type).BaseType;
+
     public override SymbolType GenerateType(SymbolTable table)
     {
-        var result = TypeName.ResolveType(table);
-
-        var tmp = (VectorType)result ?? throw new NotImplementedException();
-        foreach (var v in Values)
-        {
-            if (
-                v.Type is ScalarType st && tmp.BaseType != st
-                || (v.Type is VectorType vt && vt.BaseType != tmp.BaseType)
-                || (v.Type is VectorType vt2 && vt2.Size > tmp.Size)
-            )
-                table.Errors.Add(new(v.Info, SDSLErrorMessages.SDSL0106));
-        }
-
-        return result;
+        return TypeName.ResolveType(table);
     }
 
     public override string ToString()
@@ -194,6 +205,7 @@ public class VectorLiteral(TypeName typeName, TextLocation info) : CompositeLite
 public class MatrixLiteral(TypeName typeName, int rows, int cols, TextLocation info) : CompositeLiteral(info)
 {
     public TypeName TypeName { get; set; } = typeName;
+    public override SymbolType ElementType => ((MatrixType)Type).BaseType;
     public int Rows { get; set; } = rows;
     public int Cols { get; set; } = cols;
 
@@ -210,6 +222,7 @@ public class MatrixLiteral(TypeName typeName, int rows, int cols, TextLocation i
 
 public class ArrayLiteral(TextLocation info) : CompositeLiteral(info)
 {
+    public override SymbolType ElementType => ((ArrayType)Type).BaseType;
     public override SymbolType GenerateType(SymbolTable table)
     {
         throw new NotImplementedException();
