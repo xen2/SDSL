@@ -62,6 +62,7 @@ public partial class ShaderMixer(IExternalShaderLoader shaderLoader)
         File.WriteAllBytes("test.spv", bytecode);
         File.WriteAllText("test.spvdis", Spv.Dis(temp));
 #endif
+        Spv.Dis(temp, DisassemblerFlags.Name & DisassemblerFlags.Id | DisassemblerFlags.InstructionIndex, true);
     }
 
     class MixinGlobalContext
@@ -148,7 +149,7 @@ public partial class ShaderMixer(IExternalShaderLoader shaderLoader)
         mixinNode.StartInstruction = temp.Count;
         foreach (var shaderClass in mixinSource.Mixins)
         {
-            var shader = SpirvBuilder.GetOrLoadShader(ShaderLoader, shaderClass.ClassName);
+            var shader = SpirvBuilder.GetOrLoadShader(ShaderLoader, shaderClass);
             offset += nextOffset;
             nextOffset = 0;
             shader.Header = shader.Header with { Bound = shader.Header.Bound + offset };
@@ -217,7 +218,7 @@ public partial class ShaderMixer(IExternalShaderLoader shaderLoader)
 
             PopulateShaderInfo(temp, shaderStart, temp.Count, shaderInfo, mixinNode);
 
-            shadersByName.Add(shaderClass.ClassName, shaderInfo);
+            shadersByName.Add(shaderClass.ToClassName(), shaderInfo);
             shaders.Add(shaderInfo);
 
             // Remap ids from inherited class (OpSDSLImport*)

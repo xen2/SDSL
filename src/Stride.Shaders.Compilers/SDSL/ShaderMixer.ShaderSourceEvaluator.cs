@@ -29,10 +29,7 @@ public partial class ShaderMixer
         };
         foreach (var mixinToMerge in shaderMixinSource.Mixins)
         {
-            if (mixinToMerge.GenericArguments != null && mixinToMerge.GenericArguments.Length > 0)
-                throw new NotImplementedException();
-
-            var buffer = SpirvBuilder.GetOrLoadShader(ShaderLoader, mixinToMerge.ClassName);
+            var buffer = SpirvBuilder.GetOrLoadShader(ShaderLoader, mixinToMerge);
             SpirvBuilder.BuildInheritanceList(ShaderLoader, buffer, mixinList);
             if (!mixinList.Contains(mixinToMerge))
                 mixinList.Add(mixinToMerge);
@@ -43,7 +40,7 @@ public partial class ShaderMixer
 
         foreach (var shaderName in mixinList)
         {
-            var shader = SpirvBuilder.GetOrLoadShader(ShaderLoader, shaderName.ClassName);
+            var shader = SpirvBuilder.GetOrLoadShader(ShaderLoader, shaderName);
             ShaderClass.ProcessNameAndTypes(shader, 0, shader.Count, out var names, out var types);
 
             bool hasStage = false;

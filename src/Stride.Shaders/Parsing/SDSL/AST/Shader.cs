@@ -189,12 +189,17 @@ public class ShaderClass(Identifier name, TextLocation info) : ShaderDeclaration
         var inheritanceList = new List<ShaderClassSource>();
         foreach (var mixin in Mixins)
         {
-            SpirvBuilder.BuildInheritanceList(table.ShaderLoader, new ShaderClassSource(mixin.Name), inheritanceList);
+            var shaderClassSource = new ShaderClassSource(mixin.Name);
+            if (mixin.Generics != null)
+            {
+                shaderClassSource.GenericArguments = mixin.Generics.Values.Select(x => x.ToString()).ToArray();
+            }
+            SpirvBuilder.BuildInheritanceList(table.ShaderLoader, shaderClassSource, inheritanceList);
         }
 
         foreach (var mixin in inheritanceList)
         {
-            LoadExternalShaderType(table, mixin.ClassName);
+            LoadExternalShaderType(table, mixin);
         }
 
         var symbols = new List<Symbol>();
@@ -207,7 +212,7 @@ public class ShaderClass(Identifier name, TextLocation info) : ShaderDeclaration
                 table.DeclaredTypes.TryAdd(genericParameterType.ToString(), genericParameterType);
 
                 var genericParameterTypeId = context.GetOrRegister(genericParameterType);
-                context.Add(new OpSDSLGenericParameter(context.Bound, genericParameterTypeId));
+                context.Add(new OpSDSLGenericParameter(genericParameterTypeId, context.Bound));
                 context.AddName(context.Bound, genericParameter.Name);
                 table.CurrentFrame.Add(genericParameter.Name, new(new(genericParameter.Name, SymbolKind.ConstantGeneric), genericParameterType, context.Bound));
                 context.Bound++;
@@ -234,7 +239,9 @@ public class ShaderClass(Identifier name, TextLocation info) : ShaderDeclaration
             {
                 if (!svar.TypeName.TryResolveType(table, out var memberType))
                 {
-                    memberType = LoadExternalShaderType(table, svar.TypeName.Name);
+                    if (svar.TypeName.Name.Contains("<"))
+                        throw new NotImplementedException("Can't have member variables with generic shader types");
+                    memberType = LoadExternalShaderType(table, new ShaderClassSource(svar.TypeName.Name));
 
                     table.DeclaredTypes.TryAdd(memberType.ToString(), memberType);
                 }
@@ -269,7 +276,7 @@ public class ShaderClass(Identifier name, TextLocation info) : ShaderDeclaration
 
         foreach (var mixin in inheritanceList)
         {
-            var shaderType = (ShaderSymbol)table.DeclaredTypes[mixin.ClassName];
+            var shaderType = (ShaderSymbol)table.DeclaredTypes[mixin.ToClassName()];
 
             // Import types and variables/functions
             context.FluentAdd(new OpSDSLImportShader(context.Bound, new(shaderType.Name), ImportType.Inherit), out var shader);
@@ -320,12 +327,15 @@ public class ShaderClass(Identifier name, TextLocation info) : ShaderDeclaration
         table.Pop();
     }
 
-    private static ShaderSymbol LoadExternalShaderType(SymbolTable table, string className)
+    private static ShaderSymbol LoadExternalShaderType(SymbolTable table, ShaderClassSource classSource)
     {
-        if (!table.ShaderLoader.LoadExternalBuffer(className, out var shaderBuffer))
-            throw new InvalidOperationException($"Type [{className}] not found");
+        if (!table.ShaderLoader.LoadExternalBuffer(classSource.ClassName, out var shaderBuffer))
+            throw new InvalidOperationException($"Type [{classSource.ClassName}] not found");
 
-        var shaderType = CreateShaderType(shaderBuffer, className);
+        if (classSource.GenericArguments.Length > 0)
+            shaderBuffer = SpirvBuilder.InstantiateGenericShader(shaderBuffer, classSource.GenericArguments);
+
+        var shaderType = CreateShaderType(shaderBuffer, classSource.ToClassName());
 
         RegisterShaderType(table, shaderType);
 

@@ -1,4 +1,4 @@
-// PSMain(ExpectedResult=#BFFFFFFF)
+// PSMain(ExpectedResult=#11FFFFFF)
 
 namespace Stride.Shaders.Tests;
 
@@ -10,15 +10,15 @@ shader Compute
     }
 }
 
-shader ComputeFixed<float4 TVALUE> : Compute
+shader ComputeFixed<float TVALUE> : Compute
 {
     override float Compute()
     {
-        return base.Compute() + TVALUE;
+        return base.Compute() + TVALUE / 255.0;
     }
 }
 
-shader Generics1 : ComputeFixed<0.25>, ComputeFixed<0.5>, ComputeFixed<0.25>
+shader Generics1 : ComputeFixed<7.0>, ComputeFixed<10.0>, ComputeFixed<7.0>
 {
     stream float4 ColorTarget : SV_Target0;
 
