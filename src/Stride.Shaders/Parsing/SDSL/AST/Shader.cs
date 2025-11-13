@@ -1,3 +1,4 @@
+using CommunityToolkit.HighPerformance;
 using CommunityToolkit.HighPerformance.Buffers;
 using Stride.Shaders.Core;
 using Stride.Shaders.Core.Analysis;
@@ -8,6 +9,7 @@ using Stride.Shaders.Spirv.Core;
 using Stride.Shaders.Spirv.Core.Buffers;
 using System;
 using System.Reflection;
+using System.Reflection.Metadata;
 using System.Runtime.InteropServices;
 using static Stride.Shaders.Spirv.Specification;
 
@@ -116,7 +118,7 @@ public class ShaderClass(Identifier name, TextLocation info) : ShaderDeclaration
             {
                 if (importShader.Type == ImportType.External)
                 {
-                    types.Add(importShader.ResultId, new ShaderSymbol(importShader.ShaderName, []));
+                    types.Add(importShader.ResultId, new ShaderSymbol(importShader.ShaderName, [], importShader.Values.Elements.Memory.ToArray(), []));
                 }
             }
         }
@@ -136,11 +138,12 @@ public class ShaderClass(Identifier name, TextLocation info) : ShaderDeclaration
         }
     }
 
-    private static ShaderSymbol CreateShaderType(NewSpirvBuffer buffer, string className)
+    private static ShaderSymbol CreateShaderType(NewSpirvBuffer buffer, ShaderClassSource classSource)
     {
         ProcessNameAndTypes(buffer, 0, buffer.Count, out var names, out var types);
 
         var symbols = new List<Symbol>();
+        var openGenerics = new int[0];
         for (var index = 0; index < buffer.Count; index++)
         {
             var instruction = buffer[index];
@@ -168,15 +171,20 @@ public class ShaderClass(Identifier name, TextLocation info) : ShaderDeclaration
                 var sid = new SymbolID(functionName, SymbolKind.Method, FunctionFlags: functionFlags);
                 symbols.Add(new(sid, functionType, functionInstruction.ResultId));
             }
+
+            if (instruction.Op == Op.OpSDSLGenericParameter)
+            {
+                throw new NotImplementedException();
+            }
         }
 
-        var shaderType = new ShaderSymbol(className, symbols);
+        var shaderType = new ShaderSymbol(classSource.ClassName, classSource.GenericArguments, openGenerics, symbols);
         return shaderType;
     }
 
     private static void RegisterShaderType(SymbolTable table, ShaderSymbol shaderType)
     {
-        table.DeclaredTypes.Add(shaderType.Name, shaderType);
+        table.DeclaredTypes.Add(shaderType.ToClassName(), shaderType);
     }
 
     public void Compile(CompilerUnit compiler, SymbolTable table)
@@ -203,11 +211,12 @@ public class ShaderClass(Identifier name, TextLocation info) : ShaderDeclaration
         }
 
         var symbols = new List<Symbol>();
-
+        var openGenerics = new int[Generics != null ? Generics.Parameters.Count : 0];
         if (Generics != null)
         {
-            foreach (var genericParameter in Generics.Parameters)
+            for (int i = 0; i < Generics.Parameters.Count; i++)
             {
+                var genericParameter = Generics.Parameters[i];
                 var genericParameterType = genericParameter.TypeName.ResolveType(table);
                 table.DeclaredTypes.TryAdd(genericParameterType.ToString(), genericParameterType);
 
@@ -215,6 +224,9 @@ public class ShaderClass(Identifier name, TextLocation info) : ShaderDeclaration
                 context.Add(new OpSDSLGenericParameter(genericParameterTypeId, context.Bound));
                 context.AddName(context.Bound, genericParameter.Name);
                 table.CurrentFrame.Add(genericParameter.Name, new(new(genericParameter.Name, SymbolKind.ConstantGeneric), genericParameterType, context.Bound));
+
+                openGenerics[i] = context.Bound;
+
                 context.Bound++;
             }
         }
@@ -265,7 +277,7 @@ public class ShaderClass(Identifier name, TextLocation info) : ShaderDeclaration
             }
         }
 
-        var currentShader = new ShaderSymbol(Name, symbols);
+        var currentShader = new ShaderSymbol(Name, [], openGenerics, symbols);
         RegisterShaderType(table, currentShader);
 
         table.CurrentShader = currentShader;
@@ -279,7 +291,27 @@ public class ShaderClass(Identifier name, TextLocation info) : ShaderDeclaration
             var shaderType = (ShaderSymbol)table.DeclaredTypes[mixin.ToClassName()];
 
             // Import types and variables/functions
-            context.FluentAdd(new OpSDSLImportShader(context.Bound, new(shaderType.Name), ImportType.Inherit), out var shader);
+            var unresolvedGenericSymbols = shaderType.UnresolvedGenericSymbols;
+            if (shaderType.GenericArguments.Length > 0)
+            {
+                unresolvedGenericSymbols = new int[shaderType.GenericArguments.Length];
+                for (int i = 0; i < shaderType.GenericArguments.Length; i++)
+                {
+                    var genericArgument = shaderType.GenericArguments[i];
+                    if (genericArgument.EndsWith("f32"))
+                    {
+                        var floatType = context.GetOrRegister(ScalarType.From("float"));
+                        var floatValue = float.Parse(genericArgument.Substring(0, genericArgument.Length - "f32".Length));
+                        context.Add(new OpConstant<float>(floatType, context.Bound, floatValue));
+                        unresolvedGenericSymbols[i] = context.Bound++;
+                    }
+                    else
+                    {
+                        throw new NotImplementedException($"Unknown type for generic argument with value {genericArgument}");
+                    }
+                }
+            }
+            context.FluentAdd(new OpSDSLImportShader(context.Bound, ImportType.Inherit, new(shaderType.Name), new(unresolvedGenericSymbols.AsSpan())), out var shader);
             context.AddName(context.Bound, shaderType.Name);
             context.Bound++;
 
@@ -335,7 +367,7 @@ public class ShaderClass(Identifier name, TextLocation info) : ShaderDeclaration
         if (classSource.GenericArguments.Length > 0)
             shaderBuffer = SpirvBuilder.InstantiateGenericShader(shaderBuffer, classSource.GenericArguments);
 
-        var shaderType = CreateShaderType(shaderBuffer, classSource.ToClassName());
+        var shaderType = CreateShaderType(shaderBuffer, classSource);
 
         RegisterShaderType(table, shaderType);
 

@@ -4,6 +4,7 @@ using Stride.Shaders.Spirv.Core.Buffers;
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Runtime.CompilerServices;
 using System.Text;
 using System.Threading.Tasks;
 using static Stride.Shaders.Spirv.Specification;
@@ -20,15 +21,8 @@ public partial class SpirvBuilder
         {
             if (i.Op == Specification.Op.OpSDSLImportShader && (OpSDSLImportShader)i is { } importShader)
             {
-                int ltIndex = importShader.ShaderName.IndexOf('<');
-                var shaderName = importShader.ShaderName;
-                var shaderClassSource = new ShaderClassSource(importShader.ShaderName);
-                if (ltIndex != -1)
-                {
-                    // Generic type: parse it
-                    shaderClassSource.ClassName = shaderName.Substring(0, ltIndex);
-                    shaderClassSource.GenericArguments = shaderName.Substring(ltIndex + 1).TrimEnd('>').Split(',').ToArray();
-                }
+                var shaderClassSource = ConvertToShaderClassSource(buffer, 0, buffer.Count, importShader);
+
                 shaderMapping[importShader.ResultId] = shaderClassSource;
             }
         }
@@ -42,6 +36,46 @@ public partial class SpirvBuilder
                 BuildInheritanceList(shaderLoader, shaderName, inheritanceList);
             }
         }
+    }
+
+    internal static string ResolveConstant(NewSpirvBuffer buffer, int shaderStart, int shaderEnd, int id)
+    {
+        for (var index = shaderStart; index < shaderEnd; index++)
+        {
+            var i = buffer[index];
+            // TODO: some way to query type before casting?
+            // TODO: cast is broken
+            if (i.Op == Op.OpConstant) // && (OpConstant<float>)i is { } constant)
+            {
+                if (i.Data.IdResult == id)
+                {
+                    var value = new LiteralValue<float>(i.Data.Memory.Span[3..]);
+                    return value.Value.ToString() + "f32";
+                }
+            }
+        }
+
+        throw new InvalidOperationException($"Constant {id} not found or its opcode could not be processed");
+    }
+
+    public static ShaderClassSource ConvertToShaderClassSource(NewSpirvBuffer buffer, int shaderStart, int shaderEnd, OpSDSLImportShader importShader)
+    {
+        var shaderClassSource = new ShaderClassSource(importShader.ShaderName);
+
+        if (importShader.Values.Elements.Length > 0)
+        {
+            var genericArguments = new string[importShader.Values.Elements.Length];
+            var genericArgumentIndex = 0;
+            foreach (var element in importShader.Values)
+            {
+                // Resolve constant
+                // TODO: single pass, avoid O(n^2) and OpSpecConstantOp
+                genericArguments[genericArgumentIndex++] = ResolveConstant(buffer, shaderStart, shaderEnd, element);
+            }
+            shaderClassSource.GenericArguments = genericArguments;
+        }
+
+        return shaderClassSource;
     }
 
     public static void BuildInheritanceList(IExternalShaderLoader shaderLoader, ShaderClassSource classSource, List<ShaderClassSource> inheritanceList)

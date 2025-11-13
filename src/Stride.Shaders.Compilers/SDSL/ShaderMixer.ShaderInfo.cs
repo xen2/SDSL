@@ -116,7 +116,8 @@ public partial class ShaderMixer
             {
                 if (importShader.Type == Specification.ImportType.Inherit)
                 {
-                    importedShaders.Add(importShader.ResultId, mixinNode.ShadersByName[importShader.ShaderName]);
+                    var shaderClassSource = Spirv.Building.SpirvBuilder.ConvertToShaderClassSource(temp, shaderStart, shaderEnd, importShader);
+                    importedShaders.Add(importShader.ResultId, mixinNode.ShadersByName[shaderClassSource.ToClassName()]);
 
                     SetOpNop(i.Data.Memory.Span);
                 }

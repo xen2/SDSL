@@ -552,17 +552,6 @@ public struct OpSDSLImportShader : IMemoryInstruction
         }
     }
 
-    public string ShaderName
-    {
-        get;
-        set
-        {
-            field = value;
-            if (InstructionMemory is not null)
-                UpdateInstructionMemory();
-        }
-    }
-
     public ImportType Type
     {
         get;
@@ -574,26 +563,53 @@ public struct OpSDSLImportShader : IMemoryInstruction
         }
     }
 
+    public string ShaderName
+    {
+        get;
+        set
+        {
+            field = value;
+            if (InstructionMemory is not null)
+                UpdateInstructionMemory();
+        }
+    }
+
+    public LiteralArray<int> Values
+    {
+        get;
+        set
+        {
+            field.Assign(value);
+            if (InstructionMemory is not null)
+                UpdateInstructionMemory();
+        }
+    }
+
     public OpSDSLImportShader(OpDataIndex index)
     {
         foreach (var o in index.Data)
         {
             if (o.Name == "resultId")
                 ResultId = o.ToLiteral<int>();
-            else if (o.Name == "shaderName")
-                ShaderName = o.ToLiteral<string>();
             else if (o.Name == "type")
                 Type = o.ToEnum<ImportType>();
+            else if (o.Name == "shaderName")
+                ShaderName = o.ToLiteral<string>();
+            else if (o.Name == "values")
+                Values = o.ToLiteralArray<int>();
         }
 
+        if (Values.WordCount == -1)
+            Values = new();
         DataIndex = index;
     }
 
-    public OpSDSLImportShader(int resultId, string shaderName, ImportType type)
+    public OpSDSLImportShader(int resultId, ImportType type, string shaderName, LiteralArray<int> values)
     {
         ResultId = resultId;
-        ShaderName = shaderName;
         Type = type;
+        ShaderName = shaderName;
+        Values = values;
         UpdateInstructionMemory();
     }
 
@@ -601,7 +617,7 @@ public struct OpSDSLImportShader : IMemoryInstruction
     {
         if (InstructionMemory is null)
             InstructionMemory = MemoryOwner<int>.Empty;
-        Span<int> instruction = [(int)Op.OpSDSLImportShader, ResultId, ..ShaderName.AsDisposableLiteralValue().Words, (int)Type];
+        Span<int> instruction = [(int)Op.OpSDSLImportShader, ResultId, (int)Type, ..ShaderName.AsDisposableLiteralValue().Words, ..Values.Words];
         instruction[0] |= instruction.Length << 16;
         if (instruction.Length == InstructionMemory.Length)
             instruction.CopyTo(InstructionMemory.Span);
@@ -1365,6 +1381,102 @@ public struct OpSDSLGenericParameter : IMemoryInstruction
     }
 
     public static implicit operator OpSDSLGenericParameter(OpDataIndex odi) => new(odi);
+}
+
+public struct OpConstantStringSDSL : IMemoryInstruction
+{
+    public OpDataIndex? DataIndex { get; set; }
+
+    public MemoryOwner<int> InstructionMemory
+    {
+        readonly get
+        {
+            if (DataIndex is OpDataIndex odi)
+                return odi.Data.Memory;
+            else
+                return field;
+        }
+
+        private set
+        {
+            if (DataIndex is OpDataIndex odi)
+            {
+                odi.Data.Memory.Dispose();
+                odi.Data.Memory = value;
+            }
+            else
+                field = value;
+        }
+    }
+
+    public OpConstantStringSDSL()
+    {
+        InstructionMemory = MemoryOwner<int>.Allocate(1);
+        InstructionMemory.Span[0] = (int)Op.OpConstantStringSDSL | (1 << 16);
+    }
+
+    public static implicit operator Id(OpConstantStringSDSL inst) => new Id(inst.ResultId);
+    public static implicit operator int (OpConstantStringSDSL inst) => inst.ResultId;
+    public int ResultId
+    {
+        get;
+        set
+        {
+            field = value;
+            if (InstructionMemory is not null)
+                UpdateInstructionMemory();
+        }
+    }
+
+    public string LiteralString
+    {
+        get;
+        set
+        {
+            field = value;
+            if (InstructionMemory is not null)
+                UpdateInstructionMemory();
+        }
+    }
+
+    public OpConstantStringSDSL(OpDataIndex index)
+    {
+        foreach (var o in index.Data)
+        {
+            if (o.Name == "resultId")
+                ResultId = o.ToLiteral<int>();
+            else if (o.Name == "literalString")
+                LiteralString = o.ToLiteral<string>();
+        }
+
+        DataIndex = index;
+    }
+
+    public OpConstantStringSDSL(int resultId, string literalString)
+    {
+        ResultId = resultId;
+        LiteralString = literalString;
+        UpdateInstructionMemory();
+    }
+
+    public void UpdateInstructionMemory()
+    {
+        if (InstructionMemory is null)
+            InstructionMemory = MemoryOwner<int>.Empty;
+        Span<int> instruction = [(int)Op.OpConstantStringSDSL, ResultId, ..LiteralString.AsDisposableLiteralValue().Words];
+        instruction[0] |= instruction.Length << 16;
+        if (instruction.Length == InstructionMemory.Length)
+            instruction.CopyTo(InstructionMemory.Span);
+        else
+        {
+            var tmp = MemoryOwner<int>.Allocate(instruction.Length);
+            instruction.CopyTo(tmp.Span);
+            InstructionMemory?.Dispose();
+            InstructionMemory = tmp;
+        }
+    }
+
+    public static implicit operator OpConstantStringSDSL(OpDataIndex odi) => new(odi);
 }
 
 public struct OpNop : IMemoryInstruction
