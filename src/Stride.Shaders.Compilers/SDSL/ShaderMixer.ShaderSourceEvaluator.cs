@@ -33,19 +33,18 @@ public partial class ShaderMixer
             if (mixinToMerge.GenericArguments.Length > 0)
                 throw new NotImplementedException("Generics at the top-level shaders is not supported");
             var mixinToMerge2 = new ShaderClassInstantiation(mixinToMerge.ClassName, []);
-            var buffer = SpirvBuilder.GetOrLoadShader(ShaderLoader, mixinToMerge2);
+            var buffer = SpirvBuilder.GetOrLoadShader(ShaderLoader, mixinToMerge2, ResolveStep.Mix);
             mixinToMerge2.Buffer = buffer;
-            SpirvBuilder.BuildInheritanceList(ShaderLoader, buffer, mixinList);
-            if (!mixinList.Contains(mixinToMerge2))
-                mixinList.Add(mixinToMerge2);
+            //SpirvBuilder.BuildInheritanceList(ShaderLoader, buffer, mixinList, ResolveStep.Mix);
+            SpirvBuilder.BuildInheritanceList(ShaderLoader, mixinToMerge2, mixinList, ResolveStep.Mix);
         }
 
         var compositions = new Dictionary<string, ShaderMixinInstantiation>();
         var result = new ShaderMixinInstantiation(mixinList, compositions);
 
-        foreach (var shaderName in mixinList)
+        foreach (var shaderName in mixinList.ToArray())
         {
-            var shader = SpirvBuilder.GetOrLoadShader(ShaderLoader, shaderName);
+            var shader = shaderName.Buffer;
             ShaderClass.ProcessNameAndTypes(shader, 0, shader.Count, out var names, out var types);
 
             bool hasStage = false;
@@ -77,7 +76,7 @@ public partial class ShaderMixer
             // If there are any stage variables, add class to root
             if (!isRoot && hasStage)
             {
-                var shaderNameStageOnly = new ShaderClassInstantiation(shaderName.ClassName, shaderName.GenericArguments, ImportStageOnly: true);
+                var shaderNameStageOnly = new ShaderClassInstantiation(shaderName.ClassName, shaderName.GenericArguments, ImportStageOnly: true) { Buffer = shaderName.Buffer, ShaderReferences = shaderName.ShaderReferences };
                 // Make sure it's not already added yet (either standard or stage only)
                 if (!root!.Mixins.Contains(shaderName) && !root!.Mixins.Contains(shaderNameStageOnly))
                     root!.Mixins.Add(shaderNameStageOnly);

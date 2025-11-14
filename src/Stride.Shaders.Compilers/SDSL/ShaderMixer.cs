@@ -145,7 +145,6 @@ public partial class ShaderMixer(IExternalShaderLoader shaderLoader)
         var nextOffset = 0;
 
         var shaders = mixinNode.Shaders;
-        var shadersByName = mixinNode.ShadersByName;
 
         mixinNode.StartInstruction = temp.Count;
         foreach (var shaderClass in mixinSource.Mixins)
@@ -211,6 +210,10 @@ public partial class ShaderMixer(IExternalShaderLoader shaderLoader)
                     OffsetIds(i2, offset);
             }
 
+            shaderClass.Start = shaderStart;
+            shaderClass.End = shaderStart;
+            shaderClass.OffsetId = offset;
+
             // Build ShaderInfo
             var shaderInfo = new ShaderInfo(shaders.Count, shaderClass.ClassName, shaderStart, temp.Count);
             shaderInfo.CompositionPath = mixinNode.CompositionPath;
@@ -219,11 +222,11 @@ public partial class ShaderMixer(IExternalShaderLoader shaderLoader)
 
             PopulateShaderInfo(temp, shaderStart, temp.Count, shaderInfo, mixinNode);
 
-            shadersByName.Add(shaderClass.ToClassName(), shaderInfo);
+            mixinNode.ShadersByName.Add(shaderClass.ToClassName(), shaderInfo);
             shaders.Add(shaderInfo);
 
             // Remap ids from inherited class (OpSDSLImport*)
-            RemapInheritedIds(temp, shaderStart, temp.Count, shaderInfo, mixinNode);
+            RemapInheritedIds(temp, shaderStart, temp.Count, shaderClass, shaderInfo, mixinNode);
         }
 
         mixinNode.EndInstruction = temp.Count;
@@ -261,7 +264,9 @@ public partial class ShaderMixer(IExternalShaderLoader shaderLoader)
             var i = temp[index];
             if (i.Data.Op == Op.OpSDSLShader && (OpSDSLShader)i is { } shaderInstruction)
             {
-                currentShader = mixinNode.ShadersByName[shaderInstruction.ShaderName];
+                //currentShader = mixinNode.ShadersByName[shaderInstruction.ShaderName];
+                // TODO: better way to find ShaderInfo
+                currentShader = mixinNode.Shaders.First(x => index >= x.StartInstruction && index < x.EndInstruction);
             }
             else if (i.Data.Op == Op.OpSDSLShaderEnd)
             {

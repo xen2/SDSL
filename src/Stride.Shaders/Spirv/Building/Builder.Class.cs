@@ -14,6 +14,12 @@ namespace Stride.Shaders.Spirv.Building;
 
 public record class ShaderMixinInstantiation(List<ShaderClassInstantiation> Mixins, Dictionary<string, ShaderMixinInstantiation> Compositions);
 
+public enum ResolveStep
+{
+    Compile,
+    Mix,
+}
+
 public record class ShaderClassInstantiation(string ClassName, int[] GenericArguments, bool ImportStageOnly = false) : IEquatable<ShaderClassInstantiation>
 {
     public NewSpirvBuffer Buffer { get; set; }
@@ -21,6 +27,13 @@ public record class ShaderClassInstantiation(string ClassName, int[] GenericArgu
     public string ClassName { get; set; } = ClassName;
 
     public int[] GenericArguments { get; set; } = GenericArguments;
+
+    public Dictionary<int, ShaderClassInstantiation> ShaderReferences { get; set; } = new();
+
+    public int Start { get; set; }
+    public int End { get; set; }
+
+    public int OffsetId { get; set; }
 
     public string ToClassName()
     {
@@ -66,13 +79,13 @@ public record class ShaderClassInstantiation(string ClassName, int[] GenericArgu
 
 public partial class SpirvBuilder
 {
-    public static void BuildInheritanceList(IExternalShaderLoader shaderLoader, NewSpirvBuffer buffer, List<ShaderClassInstantiation> inheritanceList)
+    private static void BuildInheritanceList(IExternalShaderLoader shaderLoader, ShaderClassInstantiation classSource, NewSpirvBuffer buffer, List<ShaderClassInstantiation> inheritanceList, ResolveStep resolveStep)
     {
         // Build shader name mapping
-        var shaderMapping = new Dictionary<int, ShaderClassInstantiation>();
+        var shaderMapping = classSource.ShaderReferences;
         foreach (var i in buffer)
         {
-            if (i.Op == Specification.Op.OpSDSLImportShader && (OpSDSLImportShader)i is { } importShader)
+            if (i.Op == Op.OpSDSLImportShader && (OpSDSLImportShader)i is { } importShader)
             {
                 var shaderClassSource = ConvertToShaderClassSource(buffer, 0, buffer.Count, importShader);
 
@@ -83,32 +96,39 @@ public partial class SpirvBuilder
         // Check inheritance
         foreach (var i in buffer)
         {
-            if (i.Op == Specification.Op.OpSDSLMixinInherit && (OpSDSLMixinInherit)i is { } inherit)
+            if (i.Op == Op.OpSDSLMixinInherit && (OpSDSLMixinInherit)i is { } inherit)
             {
                 var shaderName = shaderMapping[inherit.Shader];
-                BuildInheritanceList(shaderLoader, shaderName, inheritanceList, buffer);
+                BuildInheritanceList(shaderLoader, shaderName, inheritanceList, resolveStep, buffer);
             }
         }
     }
 
     public static ShaderClassInstantiation ConvertToShaderClassSource(NewSpirvBuffer buffer, int shaderStart, int shaderEnd, OpSDSLImportShader importShader)
     {
-        return new ShaderClassInstantiation(importShader.ShaderName, importShader.Values.Elements.Memory.ToArray()) { Buffer = buffer };
+        return new ShaderClassInstantiation(importShader.ShaderName, importShader.Values.Elements.Memory.ToArray());
     }
 
-    public static void BuildInheritanceList(IExternalShaderLoader shaderLoader, ShaderClassInstantiation classSource, List<ShaderClassInstantiation> inheritanceList, NewSpirvBuffer? parentBuffer = null)
+    public static void BuildInheritanceList(IExternalShaderLoader shaderLoader, ShaderClassInstantiation classSource, List<ShaderClassInstantiation> inheritanceList, ResolveStep resolveStep, NewSpirvBuffer? parentBuffer = null)
     {
+        // TODO: cache same instantiations within context?
         if (!inheritanceList.Contains(classSource))
         {
-            var shader = GetOrLoadShader(shaderLoader, classSource, parentBuffer);
-            classSource.Buffer = shader;
+            if (classSource.Buffer == null)
+            {
+                var shader = GetOrLoadShader(shaderLoader, classSource, resolveStep, parentBuffer);
+                classSource.Buffer = shader;
+            }
 
-            BuildInheritanceList(shaderLoader, shader, inheritanceList);
-            inheritanceList.Add(classSource);
+            if (!inheritanceList.Contains(classSource))
+            {
+                BuildInheritanceList(shaderLoader, classSource, classSource.Buffer, inheritanceList, resolveStep);
+                inheritanceList.Add(classSource);
+            }
         }
     }
 
-    public static NewSpirvBuffer InstantiateGenericShader(NewSpirvBuffer shader, ShaderClassInstantiation classSource, NewSpirvBuffer? parentBuffer = null)
+    public static NewSpirvBuffer InstantiateGenericShader(NewSpirvBuffer shader, ShaderClassInstantiation classSource, ResolveStep resolveStep, NewSpirvBuffer? parentBuffer = null)
     {
         // Instantiate generics
         var copiedShader = new NewSpirvBuffer();
@@ -167,7 +187,9 @@ public partial class SpirvBuilder
                         var value = new LiteralValue<float>(i.Data.Memory.Span[3..]);
                         resolvedParameters.Add(i.Data.IdResult!.Value, value.Value.ToString());
 
-                        // TODO: import constant?
+                        // import constant in current shader
+
+                        shader.Add(new OpConstant<float>(i.Data.IdResultType!.Value, i.Data.IdResult!.Value, value.Value));
                     }
                 }
                 else if (i.Op == Op.OpSDSLGenericParameter && (OpSDSLGenericParameter)i is { } genericParameter)
@@ -186,8 +208,11 @@ public partial class SpirvBuilder
             var parameters = string.Join(',', classSource.GenericArguments.Select(x => resolvedParameters[x]));
             var className = classSource.ClassName + "<" + parameters + ">";
 
-            classSource.ClassName = className;
-            classSource.GenericArguments = [];
+            if (resolveStep == ResolveStep.Mix)
+            {
+                classSource.ClassName = className;
+                classSource.GenericArguments = [];
+            }
 
             for (var index = 0; index < shader.Count; index++)
             {
@@ -235,13 +260,13 @@ public partial class SpirvBuilder
         }
     }
 
-    public static NewSpirvBuffer GetOrLoadShader(IExternalShaderLoader shaderLoader, ShaderClassInstantiation classSource, NewSpirvBuffer? parentBuffer = null)
+    public static NewSpirvBuffer GetOrLoadShader(IExternalShaderLoader shaderLoader, ShaderClassInstantiation classSource, ResolveStep resolveStep, NewSpirvBuffer? parentBuffer = null)
     {
         var shader = GetOrLoadShader(shaderLoader, classSource.ClassName);
 
         if (classSource.GenericArguments.Length > 0)
         {
-            shader = InstantiateGenericShader(shader, classSource, parentBuffer);
+            shader = InstantiateGenericShader(shader, classSource, resolveStep, parentBuffer);
         }
 
         return shader;

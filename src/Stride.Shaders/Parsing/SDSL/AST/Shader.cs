@@ -227,7 +227,7 @@ public class ShaderClass(Identifier name, TextLocation info) : ShaderDeclaration
                 }
             }
             var shaderClassSource = new ShaderClassInstantiation(mixin.Name, generics);
-            SpirvBuilder.BuildInheritanceList(table.ShaderLoader, shaderClassSource, inheritanceList, context.GetBuffer());
+            SpirvBuilder.BuildInheritanceList(table.ShaderLoader, shaderClassSource, inheritanceList, ResolveStep.Compile, context.GetBuffer());
         }
 
         var shaderSymbols = new List<ShaderSymbol>();
@@ -258,7 +258,10 @@ public class ShaderClass(Identifier name, TextLocation info) : ShaderDeclaration
                 {
                     if (svar.TypeName.Name.Contains("<"))
                         throw new NotImplementedException("Can't have member variables with generic shader types");
-                    memberType = LoadExternalShaderType(table, new ShaderClassInstantiation(svar.TypeName.Name, []));
+                    var classSource = new ShaderClassInstantiation(svar.TypeName.Name, []);
+                    var shader = SpirvBuilder.GetOrLoadShader(table.ShaderLoader, classSource, ResolveStep.Compile, context.GetBuffer());
+                    classSource.Buffer = shader;
+                    memberType = LoadExternalShaderType(table, classSource);
 
                     table.DeclaredTypes.TryAdd(memberType.ToString(), memberType);
                 }
