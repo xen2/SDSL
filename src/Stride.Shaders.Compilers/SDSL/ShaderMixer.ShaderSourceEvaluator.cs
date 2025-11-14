@@ -17,26 +17,31 @@ public partial class ShaderMixer
     /// <param name="root"></param>
     /// <returns></returns>
     /// <exception cref="NotImplementedException"></exception>
-    private ShaderMixinSource EvaluateInheritanceAndCompositions(ShaderSource shaderSource, ShaderMixinSource? root = null)
+    private ShaderMixinInstantiation EvaluateInheritanceAndCompositions(ShaderSource shaderSource, ShaderMixinInstantiation? root = null)
     {
         bool isRoot = root == null;
-        var mixinList = new List<ShaderClassSource>();
+        var mixinList = new List<ShaderClassInstantiation>();
 
         var shaderMixinSource = shaderSource switch
         {
             ShaderMixinSource mixinSource2 => mixinSource2,
             ShaderClassSource classSource => new ShaderMixinSource { Mixins = { classSource } },
         };
+
         foreach (var mixinToMerge in shaderMixinSource.Mixins)
         {
-            var buffer = SpirvBuilder.GetOrLoadShader(ShaderLoader, mixinToMerge);
+            if (mixinToMerge.GenericArguments.Length > 0)
+                throw new NotImplementedException("Generics at the top-level shaders is not supported");
+            var mixinToMerge2 = new ShaderClassInstantiation(mixinToMerge.ClassName, []);
+            var buffer = SpirvBuilder.GetOrLoadShader(ShaderLoader, mixinToMerge2);
+            mixinToMerge2.Buffer = buffer;
             SpirvBuilder.BuildInheritanceList(ShaderLoader, buffer, mixinList);
-            if (!mixinList.Contains(mixinToMerge))
-                mixinList.Add(mixinToMerge);
+            if (!mixinList.Contains(mixinToMerge2))
+                mixinList.Add(mixinToMerge2);
         }
 
-        shaderMixinSource.Mixins.Clear();
-        shaderMixinSource.Mixins.AddRange(mixinList);
+        var compositions = new Dictionary<string, ShaderMixinInstantiation>();
+        var result = new ShaderMixinInstantiation(mixinList, compositions);
 
         foreach (var shaderName in mixinList)
         {
@@ -58,8 +63,8 @@ public partial class ShaderMixer
                         {
                             compositionMixin = new ShaderMixinSource { Mixins = { new ShaderClassSource(shaderSymbol.Name) } };
                         }
-                        compositionMixin = (ShaderMixinSource)EvaluateInheritanceAndCompositions(compositionMixin, root ?? shaderMixinSource);
-                        shaderMixinSource.Compositions[variableName] = compositionMixin;
+                        var composition = EvaluateInheritanceAndCompositions(compositionMixin, root ?? result);
+                        compositions[variableName] = composition;
                     }
                 }
 
@@ -72,13 +77,13 @@ public partial class ShaderMixer
             // If there are any stage variables, add class to root
             if (!isRoot && hasStage)
             {
-                var shaderNameStageOnly = new ShaderClassSource(shaderName.ClassName) { GenericArguments = shaderName.GenericArguments, ImportStageOnly = true };
+                var shaderNameStageOnly = new ShaderClassInstantiation(shaderName.ClassName, shaderName.GenericArguments, ImportStageOnly: true);
                 // Make sure it's not already added yet (either standard or stage only)
                 if (!root!.Mixins.Contains(shaderName) && !root!.Mixins.Contains(shaderNameStageOnly))
                     root!.Mixins.Add(shaderNameStageOnly);
             }
         }
 
-        return shaderMixinSource;
+        return result;
     }
 }

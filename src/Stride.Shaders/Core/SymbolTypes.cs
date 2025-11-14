@@ -1,6 +1,7 @@
 using System.Diagnostics.CodeAnalysis;
 using System.Text;
 using Stride.Shaders.Spirv;
+using Stride.Shaders.Spirv.Building;
 using static Stride.Shaders.Spirv.Specification;
 
 namespace Stride.Shaders.Core;
@@ -236,28 +237,8 @@ public sealed record ConstantBufferSymbol(string Name, List<(string Name, Symbol
 public sealed record ParamsSymbol(string Name, List<(string Name, SymbolType Type)> Symbols) : SymbolType;
 public sealed record EffectSymbol(string Name, List<(string Name, SymbolType Type)> Symbols) : SymbolType;
 
-// Note: If open generic, i.e. A<float, MemberName>, Name will be A and UnresolvedGenericSymbols will be set to symbol ID in bytecode and GenericParameters will be empty
-//       If closed generic, i.e. A<1.0, "a">, Name will be A<1.0, "a"> and UnresolvedGenericSymbols will be empty and GenericParameters will be set
-public sealed record ShaderSymbol(string Name, string[] GenericArguments, int[] UnresolvedGenericSymbols, List<Symbol> Components) : SymbolType
+public sealed record ShaderSymbol(string Name, int[] GenericArguments, List<Symbol> Components) : SymbolType
 {
-    public string[] GenericArguments
-    {
-        get => field;
-        init { field = value; ValidateGenerics(); }
-    } = GenericArguments;
-
-    public int[] UnresolvedGenericSymbols
-    {
-        get => field;
-        init { field = value; ValidateGenerics(); }
-    } = UnresolvedGenericSymbols;
-
-    private void ValidateGenerics()
-    {
-        if (GenericArguments.Length > 0 && UnresolvedGenericSymbols.Length > 0)
-            throw new ArgumentException($"{nameof(GenericArguments)} and {nameof(UnresolvedGenericSymbols)} can't be set at the same time");
-    }
-
     public Symbol Get(string name, SymbolKind kind)
     {
         foreach (var e in Components)
@@ -279,30 +260,10 @@ public sealed record ShaderSymbol(string Name, string[] GenericArguments, int[] 
 
     public string ToClassName()
     {
-        if (GenericArguments.Length == 0 && UnresolvedGenericSymbols.Length == 0)
+        if (GenericArguments.Length == 0)
             return Name;
 
-        var sb = new StringBuilder();
-        sb.Append(Name);
-        sb.Append("<");
-        bool isFirst = true;
-        foreach (var item in GenericArguments)
-        {
-            sb.Append(item);
-            if (isFirst)
-                isFirst = false;
-            else
-                sb.Append(",");
-        }
-        // For unresolved generics, we only add comma (i.e. TypeA<,,,>)
-        foreach (var item in UnresolvedGenericSymbols)
-        {
-            if (isFirst)
-                isFirst = false;
-            else
-                sb.Append(",");
-        }
-        sb.Append(">");
-        return sb.ToString();
+        var className = new ShaderClassInstantiation(Name, GenericArguments);
+        return className.ToClassName();
     }
 }

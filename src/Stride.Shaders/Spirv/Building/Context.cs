@@ -192,7 +192,7 @@ public class SpirvContext
 
     private int RegisterShaderType(ShaderSymbol shaderSymbol)
     {
-        FluentAdd(new OpSDSLImportShader(Bound++, ImportType.External, new(shaderSymbol.Name), new(shaderSymbol.UnresolvedGenericSymbols.AsSpan())), out var shader);
+        FluentAdd(new OpSDSLImportShader(Bound++, ImportType.External, new(shaderSymbol.Name), new(shaderSymbol.GenericArguments.AsSpan())), out var shader);
         AddName(shader.ResultId, shaderSymbol.Name);
         for (var index = 0; index < shaderSymbol.Components.Count; index++)
         {

@@ -22,6 +22,7 @@ namespace Stride.Shaders.Compilers.SDSL;
 public partial class ShaderMixer(IExternalShaderLoader shaderLoader)
 {
     public IExternalShaderLoader ShaderLoader { get; } = shaderLoader;
+
     public void MergeSDSL(string entryShaderName, out byte[] bytecode)
     {
         var temp = new NewSpirvBuffer();
@@ -77,7 +78,7 @@ public partial class ShaderMixer(IExternalShaderLoader shaderLoader)
     }
 
 
-    MixinNode MergeMixinNode(MixinGlobalContext globalContext, SpirvContext context, SymbolTable table, NewSpirvBuffer buffer, ShaderMixinSource mixinSource, MixinNode? stage = null, string? currentCompositionPath = null)
+    MixinNode MergeMixinNode(MixinGlobalContext globalContext, SpirvContext context, SymbolTable table, NewSpirvBuffer buffer, ShaderMixinInstantiation mixinSource, MixinNode? stage = null, string? currentCompositionPath = null)
     {
         if (currentCompositionPath != null)
             buffer.Add(new OpSDSLEffect(currentCompositionPath));
@@ -137,7 +138,7 @@ public partial class ShaderMixer(IExternalShaderLoader shaderLoader)
         return mixinNode;
     }
 
-    private void ProcessMixinClasses(SpirvContext context, NewSpirvBuffer temp, ShaderMixinSource mixinSource, MixinNode mixinNode)
+    private void ProcessMixinClasses(SpirvContext context, NewSpirvBuffer temp, ShaderMixinInstantiation mixinSource, MixinNode mixinNode)
     {
         var isRoot = mixinNode.Stage == null;
         var offset = context.Bound;
@@ -149,7 +150,7 @@ public partial class ShaderMixer(IExternalShaderLoader shaderLoader)
         mixinNode.StartInstruction = temp.Count;
         foreach (var shaderClass in mixinSource.Mixins)
         {
-            var shader = SpirvBuilder.GetOrLoadShader(ShaderLoader, shaderClass);
+            var shader = shaderClass.Buffer;
             offset += nextOffset;
             nextOffset = 0;
             shader.Header = shader.Header with { Bound = shader.Header.Bound + offset };
