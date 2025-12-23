@@ -45,7 +45,7 @@ public record struct SDSLC(IExternalShaderLoader ShaderLoader)
 
                     var merged = compiler.ToBuffer();
 #if DEBUG
-                    var dis = Spv.Dis(merged, DisassemblerFlags.Name | DisassemblerFlags.Id | DisassemblerFlags.InstructionIndex, true);
+                    //var dis = Spv.Dis(merged, DisassemblerFlags.Name | DisassemblerFlags.Id | DisassemblerFlags.InstructionIndex, true);
 #endif
                     lastBuffer = merged;
 

@@ -156,8 +156,8 @@ public class SpirvContext
                     },
                 VectorType v => Buffer.Add(new OpTypeVector(Bound++, GetOrRegister(v.BaseType), v.Size)).IdResult,
                 MatrixType m => Buffer.Add(new OpTypeMatrix(Bound++, GetOrRegister(new VectorType(m.BaseType, m.Rows)), m.Columns)).IdResult,
-                ArrayType a when a.Size != -1 || a.SizeExpressionId != null => RegisterArrayType(a),
-                ArrayType a when a.Size == -1 && a.SizeExpressionId == null => Buffer.Add(new OpTypeRuntimeArray(Bound++, GetOrRegister(a.BaseType))).IdResult,
+                ArrayType a when a.Size != -1 || a.SizeExpression != null => RegisterArrayType(a),
+                ArrayType a when a.Size == -1 && a.SizeExpression == null => Buffer.Add(new OpTypeRuntimeArray(Bound++, GetOrRegister(a.BaseType))).IdResult,
                 StructType st => RegisterStructuredType(st.ToId(), st),
                 FunctionType f => RegisterFunctionType(f),
                 PointerType p => RegisterPointerType(p),
@@ -181,9 +181,54 @@ public class SpirvContext
 
     private int? RegisterArrayType(ArrayType a)
     {
+        if (a.Size == -1 && a.SizeExpression is { } sizeExpression)
+        {
+            // Import constants
+            var importBuffer = sizeExpression.Buffer;
+            if (importBuffer != Buffer)
+            {
+                var requestedIds = new Dictionary<int, int> { { sizeExpression.Id, Bound++ } };
+                for (int index = importBuffer.Count - 1; index >= 0; --index)
+                {
+                    var i = importBuffer[index];
+                    if (i.Data.IdResult is int resultId && requestedIds.TryGetValue(resultId, out var mappedId))
+                    {
+                        requestedIds.Remove(resultId);
+
+                        var i2 = new OpData(i.Data.Memory.Span);
+                        i2.IdResult = mappedId;
+
+                        // Then add IdRef operands to next requested instructions
+                        foreach (var op in i2)
+                        {
+                            if (op.Kind == OperandKind.IdRef
+                                || op.Kind == OperandKind.PairIdRefIdRef)
+                            {
+                                foreach (ref var word in op.Words)
+                                {
+                                    requestedIds.TryAdd(word, Bound++);
+                                }
+                            }
+                            else if (op.Kind == OperandKind.PairLiteralIntegerIdRef
+                                || op.Kind == OperandKind.PairIdRefLiteralInteger)
+                            {
+                                throw new NotImplementedException();
+                            }
+                        }
+
+                        Buffer.Add(i2);
+                    }
+                }
+
+                if (requestedIds.Count > 0)
+                {
+                    throw new InvalidOperationException("Could not resolve constant or one of its dependency");
+                }
+            }
+        }
         var sizeId = a.Size != -1
             ? CompileConstant((int)a.Size).Id
-            : a.SizeExpressionId ?? throw new InvalidOperationException();
+            : a.SizeExpression?.Id ?? throw new InvalidOperationException();
 
         return Buffer.Add(new OpTypeArray(Bound++, GetOrRegister(a.BaseType), sizeId)).IdResult;
     }

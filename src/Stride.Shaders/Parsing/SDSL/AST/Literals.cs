@@ -432,7 +432,7 @@ public class TypeName(string name, TextLocation info) : Literal(info)
                         arrayComputedSize = (int)i.Value;
 
                     var constantArraySize = arraySize.CompileConstantValue(table, context);
-                    symbolType = new ArrayType(symbolType, arrayComputedSize, constantArraySize.Id);
+                    symbolType = new ArrayType(symbolType, arrayComputedSize, (constantArraySize.Id, context.GetBuffer()));
                 }
             }
         }

@@ -36,6 +36,10 @@
   </ItemGroup>
 
   <ItemGroup>
+    <None Remove="..\..\assets\SDSL\RenderTests\StreamMergeSemantic.sdsl" />
+  </ItemGroup>
+
+  <ItemGroup>
     <ProjectReference Include="..\Stride.Shaders.Compilers\Stride.Shaders.Compilers.csproj" />
     <ProjectReference Include="..\Stride.Shaders\Stride.Shaders.csproj" />
   </ItemGroup>

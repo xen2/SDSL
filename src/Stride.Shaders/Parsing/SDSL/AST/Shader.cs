@@ -146,11 +146,11 @@ public class ShaderClass(Identifier name, TextLocation info) : ShaderDeclaration
                 var innerType = types[typeArray.ElementType];
                 if (SpirvBuilder.TryGetConstantValue(typeArray.Length, out var arraySizeObject, buffer))
                 {
-                    types.Add(typeArray.ResultId, new ArrayType(innerType, (int)arraySizeObject, typeArray.Length));
+                    types.Add(typeArray.ResultId, new ArrayType(innerType, (int)arraySizeObject, (typeArray.Length, buffer)));
                 }
                 else
                 {
-                    types.Add(typeArray.ResultId, new ArrayType(innerType, -1, typeArray.Length));
+                    types.Add(typeArray.ResultId, new ArrayType(innerType, -1, (typeArray.Length, buffer)));
                 }
             }
             else if (instruction.Op == Op.OpTypeRuntimeArray && (OpTypeRuntimeArray)instruction is { } typeRuntimeArray)

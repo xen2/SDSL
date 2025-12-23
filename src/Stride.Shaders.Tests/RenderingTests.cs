@@ -48,7 +48,7 @@ public class RenderingTests
 #if DEBUG
             if (result)
             {
-                Spv.Dis(buffer, DisassemblerFlags.Name | DisassemblerFlags.Id | DisassemblerFlags.InstructionIndex, true);
+                //Spv.Dis(buffer, DisassemblerFlags.Name | DisassemblerFlags.Id | DisassemblerFlags.InstructionIndex, true);
             }
 #endif
             return result;

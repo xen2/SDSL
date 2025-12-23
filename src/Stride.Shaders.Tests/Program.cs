@@ -2,4 +2,4 @@
 
 [assembly: CaptureConsole]
 
-//new RenderingTests().RenderTest1("SimpleInheritance");
+//new RenderingTests().RenderTest1("Rgroups");
