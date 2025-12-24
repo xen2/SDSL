@@ -510,6 +510,18 @@ public partial class SpirvBuilder
                 var resolved = genericResolver.ResolveGenericValueInBuffer(genericParameterType, genericParameterName, genericParameters.Count, shader, ref index, ref bound, out var textValue);
                 genericParameters.Add(new(genericParameterType, genericParameter.ResultId, genericParameter.ResultType, i.Index, genericParameterName, resolved, textValue));
             }
+
+            if (i.Op == Op.OpTypeArray && (OpTypeArray)i is { } typeArray)
+            {
+                // Make sure constant is a proper OpConstant (i.e. not an OpSpecConstant)
+                if (!TryGetInstructionById(typeArray.Length, out var lengthInstruction, shader))
+                    throw new InvalidOperationException();
+                if (lengthInstruction.Op != Op.OpConstant && TryGetConstantValue(typeArray.Length, out var value, shader))
+                {
+                    typeArray.Length = bound++;
+                    shader.Insert(index++, new OpConstant<int>(lengthInstruction.Data.IdResultType.Value, typeArray.Length, (int)value));
+                }
+            }
         }
 
         Console.WriteLine($"[Shader] Instantiating {className} with values {string.Join(",", genericParameters.Select(x => x.Value))}");
