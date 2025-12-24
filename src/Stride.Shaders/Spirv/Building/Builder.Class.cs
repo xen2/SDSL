@@ -305,32 +305,47 @@ public partial class SpirvBuilder
         }
     }
 
-    public static void InsertBufferWithoutDuplicates(NewSpirvBuffer target, ref int instructionIndex, ref int bound, int resultId, NewSpirvBuffer source)
+    public static int InsertBufferWithoutDuplicates(NewSpirvBuffer target, ref int instructionIndex, ref int bound, int? desiredResultId, NewSpirvBuffer source)
     {
         // Import in current buffer (without duplicate)
         var typeDuplicateInserter = new TypeDuplicateHelper(target);
         var remapIds = new Dictionary<int, int>();
+        int lastResultId = -1;
         for (int index = 0; index < source.Count; ++index)
         {
             var i = source[index];
             RemapIds(remapIds, i.Data);
-            if (index == source.Count - 1)
+            
+            //// If it's a generic reference, remap to OpSDSLGenericParameter which has to match during typeDuplicateInserter.CheckForDuplicates()
+            //var isGenericReference = i.Op == Op.OpSDSLGenericReference;
+            //if (isGenericReference)
+            //    i.Data.Memory.Span[0] = (int)(i.Data.Memory.Span[0] & 0xFFFF0000) | (int)Op.OpSDSLGenericParameter;
+
+            if (TypeDuplicateHelper.OpNeedCheckDuplicate(i.Op) && typeDuplicateInserter.CheckForDuplicates(i.Data, out var existingData))
             {
-                // Make sure to remap last instruction (which we assume is the actual constant) with the OpSDSLGenericParameter.ResultId
-                i.Data.IdResult = resultId;
-                target.Insert(instructionIndex++, i.Data);
+                remapIds.Add(i.Data.IdResult.Value, existingData.Data.IdResult.Value);
+                lastResultId = existingData.Data.IdResult.Value;
             }
-            else if (typeDuplicateInserter.CheckForDuplicates(i.Data, out var existingData))
-            {
-                remapIds.Add(i.Data.IdResult.Value, existingData.IdResult.Value);
-            }
+            //else if (isGenericReference)
+            //{
+            //    throw new InvalidOperationException("Generic reference could not be resolved");
+            //}
             else
             {
-                remapIds.Add(i.Data.IdResult.Value, bound);
-                i.Data.IdResult = bound++;
+                // Make sure to remap last instruction (which we assume is the actual constant) with the desired result ID
+                var resultId = index == source.Count - 1 && desiredResultId != null
+                    ? desiredResultId.Value
+                    : bound++;
+
+                remapIds.Add(i.Data.IdResult.Value, resultId);
+                i.Data.IdResult = resultId;
                 target.Insert(instructionIndex++, i.Data);
+
+                lastResultId = resultId;
             }
         }
+
+        return lastResultId;
     }
 
     class GenericResolverFromValues(string[]? genericValues) : GenericResolver
@@ -444,7 +459,12 @@ public partial class SpirvBuilder
 
             buffer.RemoveAt(instructionIndex);
 
-            InsertBufferWithoutDuplicates(buffer, ref instructionIndex, ref bound, genericParameter, bufferWithConstant);
+            var resultId = InsertBufferWithoutDuplicates(buffer, ref instructionIndex, ref bound, genericParameter.ResultId, bufferWithConstant);
+            if (resultId != genericParameter.ResultId)
+            {
+                // Need to remap all existing references
+                RemapIds(buffer, 0, buffer.Count, new Dictionary<int, int> { { genericParameter.ResultId, resultId } });
+            }
 
             // Since we removed one instruction earlier, adjust for it so that next loop process proper instruction
             instructionIndex--;

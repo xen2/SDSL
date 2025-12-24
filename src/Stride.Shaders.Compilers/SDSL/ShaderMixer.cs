@@ -329,26 +329,7 @@ public partial class ShaderMixer(IExternalShaderLoader shaderLoader)
 
             // Specific type instructions in context gets deduplicated before adding
             bool addToContext = false;
-            if (
-                // Types
-                i2.Op == Op.OpTypeVoid
-                || i2.Op == Op.OpTypeInt
-                || i2.Op == Op.OpTypeFloat
-                || i2.Op == Op.OpTypeBool
-                || i2.Op == Op.OpTypeVector
-                || i2.Op == Op.OpTypeMatrix
-                || i2.Op == Op.OpTypeArray
-                || i2.Op == Op.OpTypeRuntimeArray
-                || i2.Op == Op.OpTypePointer
-                || i2.Op == Op.OpTypeFunction
-                || i2.Op == Op.OpTypeFunctionSDSL
-                || i2.Op == Op.OpTypeImage
-                || i2.Op == Op.OpTypeSampler
-                || i2.Op == Op.OpTypeGenericSDSL
-                || i2.Op == Op.OpSDSLImportShader
-                || i2.Op == Op.OpSDSLImportVariable
-                || i2.Op == Op.OpSDSLImportFunction
-                || i2.Op == Op.OpSDSLImportStruct)
+            if (TypeDuplicateHelper.OpNeedCheckDuplicate(i2.Op))
             {
                 // We need to replace those right now (otherwise further types depending on this struct won't get properly translated)
                 if (i2.Op == Op.OpSDSLImportStruct && (OpSDSLImportStruct)i2 is { } importStruct)
@@ -368,8 +349,8 @@ public partial class ShaderMixer(IExternalShaderLoader shaderLoader)
                     {
                         if (i2.IdResult is int id)
                         {
-                            remapIds.Add(id, existingInstruction.IdResult.Value);
-                            removedIds.Add(existingInstruction.IdResult.Value);
+                            remapIds.Add(id, existingInstruction.Data.IdResult.Value);
+                            removedIds.Add(existingInstruction.Data.IdResult.Value);
                         }
                     }
                     else

@@ -94,6 +94,7 @@ public class TypeDuplicateHelper
                 //|| x.Op == Op.OpTypeStruct
                 || x.Op == Op.OpTypeImage || x.Op == Op.OpTypeSampler
                 || x.Op == Op.OpTypeGenericSDSL
+                || x.Op == Op.OpSDSLGenericParameter
                 || x.Op == Op.OpSDSLImportShader || x.Op == Op.OpSDSLImportFunction || x.Op == Op.OpSDSLImportVariable || x.Op == Op.OpSDSLImportStruct)
             {
                 comparison = MemoryExtensions.SequenceCompareTo(x.Data.Memory.Span[2..], y.Data.Memory.Span[2..]);
@@ -211,17 +212,39 @@ public class TypeDuplicateHelper
         return namesByOp;
     }
 
-    public bool CheckForDuplicates(OpData data, out OpData foundData)
+    public static bool OpNeedCheckDuplicate(Op op)
+    {
+        return op == Op.OpTypeVoid
+            || op == Op.OpTypeInt
+            || op == Op.OpTypeFloat
+            || op == Op.OpTypeBool
+            || op == Op.OpTypeVector
+            || op == Op.OpTypeMatrix
+            || op == Op.OpTypeArray
+            || op == Op.OpTypeRuntimeArray
+            || op == Op.OpTypePointer
+            || op == Op.OpTypeFunction
+            || op == Op.OpTypeFunctionSDSL
+            || op == Op.OpTypeImage
+            || op == Op.OpTypeSampler
+            || op == Op.OpTypeGenericSDSL
+            || op == Op.OpSDSLImportShader
+            || op == Op.OpSDSLImportVariable
+            || op == Op.OpSDSLImportFunction
+            || op == Op.OpSDSLImportStruct;
+        }
+
+    public bool CheckForDuplicates(OpData data, out OpDataIndex foundData)
     {
         var index = instructionsByOp.BinarySearch(new InstructionSortHelper { Op = data.Op, Index = -1, Data = data }, comparerInsert);
 
         if (index >= 0)
         {
-            foundData = instructionsByOp[index].Data;
+            foundData = new(instructionsByOp[index].Index, buffer);
             return true;
         }
 
-        foundData = data;
+        foundData = default;
         return false;
     }
 

@@ -193,9 +193,8 @@ public class SpirvContext
             if (importBuffer != Buffer)
             {
                 var index = Buffer.Count;
-                var resultId = Bound++;
                 var bound = Bound;
-                SpirvBuilder.InsertBufferWithoutDuplicates(Buffer, ref index, ref bound, resultId, importBuffer);
+                var resultId = SpirvBuilder.InsertBufferWithoutDuplicates(Buffer, ref index, ref bound, null, importBuffer);
                 Bound = bound;
 
                 sizeId = resultId;
