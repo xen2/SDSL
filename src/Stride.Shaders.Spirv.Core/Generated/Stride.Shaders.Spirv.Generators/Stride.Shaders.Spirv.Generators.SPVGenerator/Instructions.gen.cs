@@ -2367,6 +2367,28 @@ public struct OpSDSLGenericParameter : IMemoryInstruction
         }
     }
 
+    public int Index
+    {
+        get;
+        set
+        {
+            field = value;
+            if (InstructionMemory is not null)
+                UpdateInstructionMemory();
+        }
+    }
+
+    public string DeclaringClass
+    {
+        get;
+        set
+        {
+            field = value;
+            if (InstructionMemory is not null)
+                UpdateInstructionMemory();
+        }
+    }
+
     public OpSDSLGenericParameter(OpDataIndex index)
     {
         InitializeProperties(index.Data);
@@ -2386,13 +2408,19 @@ public struct OpSDSLGenericParameter : IMemoryInstruction
                 ResultType = o.ToLiteral<int>();
             else if (o.Name == "resultId")
                 ResultId = o.ToLiteral<int>();
+            else if (o.Name == "index")
+                Index = o.ToLiteral<int>();
+            else if (o.Name == "declaringClass")
+                DeclaringClass = o.ToLiteral<string>();
         }
     }
 
-    public OpSDSLGenericParameter(int resultType, int resultId)
+    public OpSDSLGenericParameter(int resultType, int resultId, int index, string declaringClass)
     {
         ResultType = resultType;
         ResultId = resultId;
+        Index = index;
+        DeclaringClass = declaringClass;
         UpdateInstructionMemory();
     }
 
@@ -2400,7 +2428,7 @@ public struct OpSDSLGenericParameter : IMemoryInstruction
     {
         if (InstructionMemory is null)
             InstructionMemory = MemoryOwner<int>.Empty;
-        Span<int> instruction = [(int)Op.OpSDSLGenericParameter, ResultType, ResultId];
+        Span<int> instruction = [(int)Op.OpSDSLGenericParameter, ResultType, ResultId, ..Index.AsDisposableLiteralValue().Words, ..DeclaringClass.AsDisposableLiteralValue().Words];
         instruction[0] |= instruction.Length << 16;
         if (instruction.Length == InstructionMemory.Length)
             instruction.CopyTo(InstructionMemory.Span);

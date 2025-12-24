@@ -146,11 +146,13 @@ public class ShaderClass(Identifier name, TextLocation info) : ShaderDeclaration
                 var innerType = types[typeArray.ElementType];
                 if (SpirvBuilder.TryGetConstantValue(typeArray.Length, out var arraySizeObject, buffer))
                 {
-                    types.Add(typeArray.ResultId, new ArrayType(innerType, (int)arraySizeObject, (typeArray.Length, buffer)));
+                    types.Add(typeArray.ResultId, new ArrayType(innerType, (int)arraySizeObject));
                 }
                 else
                 {
-                    types.Add(typeArray.ResultId, new ArrayType(innerType, -1, (typeArray.Length, buffer)));
+                    // Constant can't be computed; we need to save aside all opcodes
+                    var bufferForConstant = SpirvBuilder.ExtractConstantAsSpirvBuffer(buffer, typeArray.Length);
+                    types.Add(typeArray.ResultId, new ArrayType(innerType, -1, (typeArray.Length, bufferForConstant)));
                 }
             }
             else if (instruction.Op == Op.OpTypeRuntimeArray && (OpTypeRuntimeArray)instruction is { } typeRuntimeArray)
@@ -326,7 +328,7 @@ public class ShaderClass(Identifier name, TextLocation info) : ShaderDeclaration
                 table.DeclaredTypes.TryAdd(genericParameterType.ToString(), genericParameterType);
 
                 var genericParameterTypeId = context.GetOrRegister(genericParameterType);
-                context.Add(new OpSDSLGenericParameter(genericParameterTypeId, context.Bound));
+                context.Add(new OpSDSLGenericParameter(genericParameterTypeId, context.Bound, i, Name.Name));
                 context.AddName(context.Bound, genericParameter.Name);
                 table.CurrentFrame.Add(genericParameter.Name, new(new(genericParameter.Name, SymbolKind.ConstantGeneric), genericParameterType, context.Bound));
 

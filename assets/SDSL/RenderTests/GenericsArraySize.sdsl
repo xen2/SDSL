@@ -2,11 +2,11 @@
 
 namespace Stride.Shaders.Tests;
 
-shader GenericsArrayBase2<int TIgnored1, int TIgnored2, int TArraySizeHalf>
+shader GenericsArrayBase2<int TIgnored1, int TIgnored2, int TArraySizeHalf2>
 {
     cbuffer Test
     { 
-        int Test2[TArraySizeHalf * 2];
+        int Test2[TArraySizeHalf2 * 2];
     }
 }
 

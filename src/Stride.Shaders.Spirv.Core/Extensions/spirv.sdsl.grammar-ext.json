@@ -281,7 +281,9 @@
       "class": "Miscellaneous",
       "operands": [
         { "kind": "IdResultType" },
-        { "kind": "IdResult" }
+        { "kind": "IdResult" },
+        { "kind": "LiteralInteger", "name": "index" },
+        { "kind": "LiteralString", "name": "declaringClass" }
       ]
     },
     {

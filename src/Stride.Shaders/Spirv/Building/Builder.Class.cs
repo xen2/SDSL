@@ -247,6 +247,49 @@ public partial class SpirvBuilder
         throw new Exception("Cannot find type instruction for id " + typeId);
     }
 
+    public static NewSpirvBuffer ExtractConstantAsSpirvBuffer(NewSpirvBuffer buffer, int constantId)
+    {
+        // Go backward and find any reference
+        var newBuffer = new NewSpirvBuffer();
+        var referenced = new HashSet<int> { constantId };
+        var instructions = new List<OpData>();
+        for (int index = buffer.Count - 1; index >= 0; --index)
+        {
+            var i = buffer[index];
+            if (i.Data.IdResult is int resultId && referenced.Remove(resultId))
+            {
+                var i2 = new OpData(i.Data.Memory.Span);
+
+                // Then add IdRef operands to next requested instructions or types
+                foreach (var op in i2)
+                {
+                    if (op.Kind == OperandKind.IdRef
+                        || op.Kind == OperandKind.IdResultType
+                        || op.Kind == OperandKind.PairIdRefIdRef)
+                    {
+                        foreach (ref var word in op.Words)
+                        {
+                            referenced.Add(word);
+                        }
+                    }
+                    else if (op.Kind == OperandKind.PairLiteralIntegerIdRef
+                        || op.Kind == OperandKind.PairIdRefLiteralInteger)
+                    {
+                        throw new NotImplementedException();
+                    }
+                }
+
+                instructions.Add(i2);
+            }
+        }
+
+        // Since we went backward, reverse the list
+        instructions.Reverse();
+        foreach (var i in instructions)
+            newBuffer.Add(i);
+        return newBuffer;
+    }
+
     record struct GenericParameter(SymbolType Type, int ResultId, int ResultType, int Index, string Name, bool Resolved, object Value);
 
     abstract class GenericResolver
