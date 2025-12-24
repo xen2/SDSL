@@ -181,54 +181,34 @@ public class SpirvContext
 
     private int? RegisterArrayType(ArrayType a)
     {
-        if (a.Size == -1 && a.SizeExpression is { } sizeExpression)
+        int sizeId;
+        if (a.Size != -1)
+        {
+            sizeId = CompileConstant((int)a.Size).Id;
+        }
+        else if (a.SizeExpression is { } sizeExpression)
         {
             // Import constants
             var importBuffer = sizeExpression.Buffer;
             if (importBuffer != Buffer)
             {
-                var requestedIds = new Dictionary<int, int> { { sizeExpression.Id, Bound++ } };
-                for (int index = importBuffer.Count - 1; index >= 0; --index)
-                {
-                    var i = importBuffer[index];
-                    if (i.Data.IdResult is int resultId && requestedIds.TryGetValue(resultId, out var mappedId))
-                    {
-                        requestedIds.Remove(resultId);
+                var index = Buffer.Count;
+                var resultId = Bound++;
+                var bound = Bound;
+                SpirvBuilder.InsertBufferWithoutDuplicates(Buffer, ref index, ref bound, resultId, importBuffer);
+                Bound = bound;
 
-                        var i2 = new OpData(i.Data.Memory.Span);
-                        i2.IdResult = mappedId;
-
-                        // Then add IdRef operands to next requested instructions
-                        foreach (var op in i2)
-                        {
-                            if (op.Kind == OperandKind.IdRef
-                                || op.Kind == OperandKind.PairIdRefIdRef)
-                            {
-                                foreach (ref var word in op.Words)
-                                {
-                                    requestedIds.TryAdd(word, Bound++);
-                                }
-                            }
-                            else if (op.Kind == OperandKind.PairLiteralIntegerIdRef
-                                || op.Kind == OperandKind.PairIdRefLiteralInteger)
-                            {
-                                throw new NotImplementedException();
-                            }
-                        }
-
-                        Buffer.Add(i2);
-                    }
-                }
-
-                if (requestedIds.Count > 0)
-                {
-                    throw new InvalidOperationException("Could not resolve constant or one of its dependency");
-                }
+                sizeId = resultId;
+            }
+            else
+            {
+                sizeId = sizeExpression.Id;
             }
         }
-        var sizeId = a.Size != -1
-            ? CompileConstant((int)a.Size).Id
-            : a.SizeExpression?.Id ?? throw new InvalidOperationException();
+        else
+        {
+            throw new InvalidOperationException();
+        }
 
         return Buffer.Add(new OpTypeArray(Bound++, GetOrRegister(a.BaseType), sizeId)).IdResult;
     }

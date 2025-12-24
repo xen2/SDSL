@@ -224,6 +224,13 @@ public sealed class NewSpirvBuffer() : IDisposable, IEnumerable<OpDataIndex>
         return new OpDataIndex(Instructions.Count - 1, this);
     }
 
+    public OpDataIndex Insert(int index, OpData data)
+    {
+        Instructions.Insert(index, data);
+        UpdateBound(data);
+        return new OpDataIndex(index, this);
+    }
+
     public OpData Add<T>(in T instruction) where T : struct, IMemoryInstruction
     {
         if (instruction.DataIndex is OpDataIndex odi)
