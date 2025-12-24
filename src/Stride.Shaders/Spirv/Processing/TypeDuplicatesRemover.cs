@@ -94,7 +94,6 @@ public class TypeDuplicateHelper
                 //|| x.Op == Op.OpTypeStruct
                 || x.Op == Op.OpTypeImage || x.Op == Op.OpTypeSampler
                 || x.Op == Op.OpTypeGenericSDSL
-                || x.Op == Op.OpSDSLGenericParameter
                 || x.Op == Op.OpSDSLImportShader || x.Op == Op.OpSDSLImportFunction || x.Op == Op.OpSDSLImportVariable || x.Op == Op.OpSDSLImportStruct)
             {
                 comparison = MemoryExtensions.SequenceCompareTo(x.Data.Memory.Span[2..], y.Data.Memory.Span[2..]);
@@ -108,6 +107,17 @@ public class TypeDuplicateHelper
                     if (comparison != 0)
                         return comparison;
                 }
+            }
+            // Standard ResultType/ResultId instructions: ignore ResultId (Span[2]) and compare the rest
+            else if (x.Op == Op.OpSDSLGenericParameter)
+            {
+                comparison = x.Data.Memory.Span[1].CompareTo(y.Data.Memory.Span[1]);
+                if (comparison != 0)
+                    return comparison;
+
+                comparison = MemoryExtensions.SequenceCompareTo(x.Data.Memory.Span[3..], y.Data.Memory.Span[3..]);
+                if (comparison != 0)
+                    return comparison;
             }
             else if (x.Op == Op.OpName || x.Op == Op.OpDecorate || x.Op == Op.OpDecorateString || x.Op == Op.OpMemberName || x.Op == Op.OpMemberDecorate || x.Op == Op.OpMemberDecorateString)
             {

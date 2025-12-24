@@ -317,21 +317,20 @@ public partial class SpirvBuilder
             RemapIds(remapIds, i.Data);
             
             //// If it's a generic reference, remap to OpSDSLGenericParameter which has to match during typeDuplicateInserter.CheckForDuplicates()
-            //var isGenericReference = i.Op == Op.OpSDSLGenericReference;
-            //if (isGenericReference)
-            //    i.Data.Memory.Span[0] = (int)(i.Data.Memory.Span[0] & 0xFFFF0000) | (int)Op.OpSDSLGenericParameter;
+            var isGenericReference = i.Op == Op.OpSDSLGenericReference;
+            if (isGenericReference)
+                i.Data.Memory.Span[0] = (int)(i.Data.Memory.Span[0] & 0xFFFF0000) | (int)Op.OpSDSLGenericParameter;
 
-            if (TypeDuplicateHelper.OpNeedCheckDuplicate(i.Op) && typeDuplicateInserter.CheckForDuplicates(i.Data, out var existingData))
+            if ((TypeDuplicateHelper.OpNeedCheckDuplicate(i.Op) || isGenericReference) && typeDuplicateInserter.CheckForDuplicates(i.Data, out var existingData))
             {
                 remapIds.Add(i.Data.IdResult.Value, existingData.Data.IdResult.Value);
                 lastResultId = existingData.Data.IdResult.Value;
             }
-            //else if (isGenericReference)
-            //{
-            //    throw new InvalidOperationException("Generic reference could not be resolved");
-            //}
             else
             {
+                if (isGenericReference)
+                    i.Data.Memory.Span[0] = (int)(i.Data.Memory.Span[0] & 0xFFFF0000) | (int)Op.OpSDSLGenericReference;
+
                 // Make sure to remap last instruction (which we assume is the actual constant) with the desired result ID
                 var resultId = index == source.Count - 1 && desiredResultId != null
                     ? desiredResultId.Value
