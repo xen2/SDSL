@@ -316,12 +316,28 @@ public class ShaderMethod(
         var (builder, context) = compiler;
 
         table.Push();
-        foreach (var arg in Parameters)
+        Span<int> defaultParameters = stackalloc int[Parameters.Count];
+        var firstDefaultParameter = -1;
+        for (var index = 0; index < Parameters.Count; index++)
         {
+            var arg = Parameters[index];
             var argSym = arg.TypeName.ResolveType(table, context);
             table.DeclaredTypes.TryAdd(argSym.ToString(), argSym);
             arg.Type = argSym;
+
+            if (firstDefaultParameter != -1 && arg.DefaultValue == null)
+                throw new InvalidOperationException($"Parameter {index} ({arg.Name}) in method {Name} doesn't have a default but a previous argument had a default value");
+            if (arg.DefaultValue != null)
+            {
+                if (firstDefaultParameter == -1)
+                    firstDefaultParameter = index;
+                defaultParameters[index] = arg.DefaultValue.CompileConstantValue(table, context, arg.Type).Id;
+            }
         }
+
+        if (firstDefaultParameter != -1)
+            context.Add(new OpDecorate(function.Id,
+                new ParameterizedFlag<Specification.Decoration>(Specification.Decoration.FunctionParameterDefaultValueSDSL, defaultParameters.Slice(firstDefaultParameter))));
 
         if (Type is FunctionType ftype)
         {

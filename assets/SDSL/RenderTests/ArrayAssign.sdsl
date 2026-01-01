@@ -5,9 +5,14 @@ namespace Stride.Shaders.Tests;
 shader ArrayAssign
 {
     stream float4 ColorTarget : SV_Target0;
+    
+    void Test123(int a, int b = 3)
+    {
+    }
 
 	void PSMain()
 	{
+	    Test123(1);
 	    float4 test[4];
 	    test[0] = 4.0 / 255.0;
 		streams.ColorTarget = test[0];
