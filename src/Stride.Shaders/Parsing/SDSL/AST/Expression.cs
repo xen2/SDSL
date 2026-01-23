@@ -586,7 +586,31 @@ public class AccessorChainExpression(Expression source, TextLocation info) : Exp
 
         // Some accessors push up to 2 values on the stack
         Span<int> accessChainIds = stackalloc int[Accessors.Count * 2];
+
+        (SpirvValue Value, SymbolType ResultType) BufferLoad(BufferType bufferType, SpirvValue buffer, IndexerExpression indexerExpression)
+        {
+            var resultType = new VectorType(bufferType.BaseType, 4);
+            
+            buffer = builder.AsValue(context, buffer);
+            var location = indexerExpression.CompileAsValue(table, compiler);
+            location = builder.Convert(context, location, ScalarType.Int);
+            
+            var loadResult = builder.Insert(new OpImageRead(context.GetOrRegister(resultType), context.Bound++, buffer.Id, location.Id, null, []));
+            return (new(loadResult.ResultId, loadResult.ResultType), resultType);
+        }
         
+        (SpirvValue Value, SymbolType ResultType) TextureLoad(TextureType textureType, SpirvValue buffer, IndexerExpression indexerExpression)
+        {
+            var resultType = new VectorType(textureType.ReturnType, 4);
+            
+            buffer = builder.AsValue(context, buffer);
+            var location = indexerExpression.CompileAsValue(table, compiler);
+            location = builder.Convert(context, location, ScalarType.Int);
+            
+            var loadResult = builder.Insert(new OpImageRead(context.GetOrRegister(resultType), context.Bound++, buffer.Id, location.Id, null, []));
+            return (new(loadResult.ResultId, loadResult.ResultType), resultType);
+        }
+
         for (var i = 0; i < Accessors.Count; ++i)
         {
             var accessor = Accessors[i];
@@ -722,19 +746,16 @@ public class AccessorChainExpression(Expression source, TextLocation info) : Exp
                         accessor.Type = resultType;
                         break;
                     }
-                case (PointerType { BaseType: BufferType b }, IndexerExpression indexer):
+                case (PointerType { BaseType: BufferType or TextureType } pointerType, IndexerExpression indexer):
                 {
-                    throw new NotImplementedException();
-                }
-                case (PointerType { BaseType: StructuredBufferType bufferType }, IndexerExpression indexer):
-                {
-                    // StructuredBuffer are declared as OpTypeStruct { OpTypeRuntimeArray }
-                    // so first, we push a 0 to access the OpTypeRuntimeArray
-                    PushAccessChainId(accessChainIds, context.CompileConstant(0).Id);
-                    // Then we push the index inside the array
-                    var indexerValue = indexer.Index.CompileAsValue(table, compiler);
-                    PushAccessChainId(accessChainIds, indexerValue.Id);
-                    accessor.Type = new PointerType(bufferType.BaseType, Specification.StorageClass.StorageBuffer);
+                    // Emit OpAccessChain with everything so far
+                    EmitOpAccessChain(accessChainIds, i - 1);
+
+                    (result, accessor.Type) = pointerType.BaseType switch
+                    {
+                        BufferType b => BufferLoad(b, result, indexer),
+                        TextureType t => TextureLoad(t, result, indexer),
+                    };
                     break;
                 }
                 case (PointerType { BaseType: TextureType textureType }, IndexerExpression indexer):
@@ -748,6 +769,17 @@ public class AccessorChainExpression(Expression source, TextLocation info) : Exp
                     result = new(imageRead.ResultId, imageRead.ResultType);
                     accessor.Type = resultType;
 
+                    break;
+                }
+                case (PointerType { BaseType: StructuredBufferType bufferType }, IndexerExpression indexer):
+                {
+                    // StructuredBuffer are declared as OpTypeStruct { OpTypeRuntimeArray }
+                    // so first, we push a 0 to access the OpTypeRuntimeArray
+                    PushAccessChainId(accessChainIds, context.CompileConstant(0).Id);
+                    // Then we push the index inside the array
+                    var indexerValue = indexer.Index.CompileAsValue(table, compiler);
+                    PushAccessChainId(accessChainIds, indexerValue.Id);
+                    accessor.Type = new PointerType(bufferType.BaseType, Specification.StorageClass.StorageBuffer);
                     break;
                 }
                 case (_, MethodCall methodCall):
