@@ -592,12 +592,19 @@ public sealed partial record LoadedShaderSymbol(string Name, int[] GenericArgume
 
 public sealed partial record GenericParameterType(GenericParameterKindSDSL Kind) : SymbolType;
 
-public sealed partial record StreamsType : SymbolType
+
+public sealed partial record StreamsType(StreamsKindSDSL Kind) : SymbolType
 {
-    public override string ToString() => "Streams";
+    public override string ToString() => Kind.ToString();
+}
+
+public sealed partial record GeometryStreamType(SymbolType BaseType, GeometryStreamOutputKindSDSL Kind) : SymbolType
+{
+    public override string ToId() => $"{Kind.ToString()}Stream<{BaseType.ToId()}>";
+    public override string ToString() => $"{Kind.ToString()}Stream<{BaseType}>";
 }
 
 public sealed partial record ShaderMixinType : SymbolType
 {
-    public override string ToString() => "Streams";
+    public override string ToString() => "mixin";
 }

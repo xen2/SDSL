@@ -54,7 +54,8 @@ public partial class SpirvContext
                 StructuredBufferType b => RegisterStructuredBufferType(b),
                 SampledImage si => Buffer.Add(new OpTypeSampledImage(Bound++, GetOrRegister(si.ImageType))).IdResult,
                 GenericParameterType g => Buffer.Add(new OpTypeGenericSDSL(Bound++, g.Kind)).IdResult,
-                StreamsType s => Buffer.Add(new OpTypeStreamsSDSL(Bound++)).IdResult,
+                StreamsType s => Buffer.Add(new OpTypeStreamsSDSL(Bound++, s.Kind)).IdResult,
+                GeometryStreamType so => Buffer.Add(new OpTypeGeometryStreamOutputSDSL(Bound++, GetOrRegister(so.BaseType), so.Kind)).IdResult,
                 // StructSymbol st => RegisterStruct(st),
                 _ => throw new NotImplementedException($"Can't add type {type}")
             };

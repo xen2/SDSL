@@ -142,6 +142,11 @@
             return DefaultVisit(streamsType);
         }
 
+        public virtual TResult Visit(Stride.Shaders.Core.GeometryStreamType geometryStreamType)
+        {
+            return DefaultVisit(geometryStreamType);
+        }
+
         public virtual TResult Visit(Stride.Shaders.Core.ShaderMixinType shaderMixinType)
         {
             return DefaultVisit(shaderMixinType);
@@ -410,6 +415,17 @@
             return (SymbolType)base.Visit(streamsType);
         }
 
+        public override SymbolType Visit(Stride.Shaders.Core.GeometryStreamType geometryStreamType)
+        {
+            var baseTypeTemp = (Stride.Shaders.Core.SymbolType)VisitType(geometryStreamType.BaseType);
+            if (!ReferenceEquals(baseTypeTemp, geometryStreamType.BaseType))
+                geometryStreamType = geometryStreamType with
+                {
+                    BaseType = baseTypeTemp
+                };
+            return (SymbolType)base.Visit(geometryStreamType);
+        }
+
         public override SymbolType Visit(Stride.Shaders.Core.ShaderMixinType shaderMixinType)
         {
             return (SymbolType)base.Visit(shaderMixinType);
@@ -556,6 +572,11 @@
         public virtual void Visit(Stride.Shaders.Core.StreamsType streamsType)
         {
             DefaultVisit(streamsType);
+        }
+
+        public virtual void Visit(Stride.Shaders.Core.GeometryStreamType geometryStreamType)
+        {
+            DefaultVisit(geometryStreamType);
         }
 
         public virtual void Visit(Stride.Shaders.Core.ShaderMixinType shaderMixinType)
@@ -724,6 +745,12 @@
         public override void Visit(Stride.Shaders.Core.StreamsType streamsType)
         {
             base.Visit(streamsType);
+        }
+
+        public override void Visit(Stride.Shaders.Core.GeometryStreamType geometryStreamType)
+        {
+            VisitType(geometryStreamType.BaseType);
+            base.Visit(geometryStreamType);
         }
 
         public override void Visit(Stride.Shaders.Core.ShaderMixinType shaderMixinType)
@@ -1168,6 +1195,22 @@ namespace Stride.Shaders.Core
 namespace Stride.Shaders.Core
 {
     public partial record StreamsType
+    {
+        public override void Accept(TypeVisitor visitor)
+        {
+            visitor.Visit(this);
+        }
+
+        public override TResult Accept<TResult>(TypeVisitor<TResult> visitor)
+        {
+            return visitor.Visit(this);
+        }
+    }
+}
+
+namespace Stride.Shaders.Core
+{
+    public partial record GeometryStreamType
     {
         public override void Accept(TypeVisitor visitor)
         {

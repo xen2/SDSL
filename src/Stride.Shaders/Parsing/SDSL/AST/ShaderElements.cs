@@ -69,6 +69,9 @@ public enum ParameterModifiers : int
     InOut = In | Out,
 
     Const = 0x10,
+    
+    Point = 0x20,
+    Triangle = 0x40,
 }
 
 public static class ShaderVariableInformationExtensions
@@ -129,6 +132,8 @@ public static class ShaderVariableInformationExtensions
             "out" => ParameterModifiers.Out,
             "inout" => ParameterModifiers.InOut,
             "const" => ParameterModifiers.Const,
+            "point" => ParameterModifiers.Point,
+            "triangle" => ParameterModifiers.Triangle,
         };
     }
 }

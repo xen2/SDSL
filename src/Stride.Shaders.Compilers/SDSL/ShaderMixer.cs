@@ -63,7 +63,9 @@ public partial class ShaderMixer(IExternalShaderLoader shaderLoader)
         
         context.Insert(0, new OpCapability(Capability.Shader));
         context.Insert(1, new OpCapability(Capability.SampledBuffer));
-        context.Insert(2, new OpMemoryModel(AddressingModel.Logical, MemoryModel.GLSL450));
+        // TODO: only if geometry shader present
+        context.Insert(2, new OpCapability(Capability.Geometry));
+        context.Insert(3, new OpMemoryModel(AddressingModel.Logical, MemoryModel.GLSL450));
         
         // Process streams and remove unused code/cbuffer/variable/resources
         var interfaceProcessor = new InterfaceProcessor

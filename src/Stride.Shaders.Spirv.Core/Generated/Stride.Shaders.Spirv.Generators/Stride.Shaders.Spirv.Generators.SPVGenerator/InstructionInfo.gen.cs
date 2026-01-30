@@ -69,6 +69,10 @@ public partial class InstructionInfo
         Instance.Register(Op.OpTypeGenericSDSL, OperandKind.IdResult, OperandQuantifier.One, "resultId", "Miscellaneous", []);
         Instance.Register(Op.OpTypeGenericSDSL, OperandKind.GenericParameterKindSDSL, OperandQuantifier.One, "kind", "Miscellaneous", []);
         Instance.Register(Op.OpTypeStreamsSDSL, OperandKind.IdResult, OperandQuantifier.One, "resultId", "Miscellaneous", []);
+        Instance.Register(Op.OpTypeStreamsSDSL, OperandKind.StreamsKindSDSL, OperandQuantifier.One, "kind", "Miscellaneous", []);
+        Instance.Register(Op.OpTypeGeometryStreamOutputSDSL, OperandKind.IdResult, OperandQuantifier.One, "resultId", "Miscellaneous", []);
+        Instance.Register(Op.OpTypeGeometryStreamOutputSDSL, OperandKind.IdRef, OperandQuantifier.One, "baseType", "Miscellaneous", []);
+        Instance.Register(Op.OpTypeGeometryStreamOutputSDSL, OperandKind.GeometryStreamOutputKindSDSL, OperandQuantifier.One, "kind", "Miscellaneous", []);
         Instance.Register(Op.OpForeachSDSL, OperandKind.IdResultType, OperandQuantifier.One, "resultType", "Miscellaneous", []);
         Instance.Register(Op.OpForeachSDSL, OperandKind.IdResult, OperandQuantifier.One, "resultId", "Miscellaneous", []);
         Instance.Register(Op.OpForeachSDSL, OperandKind.IdRef, OperandQuantifier.One, "collection", "Miscellaneous", []);

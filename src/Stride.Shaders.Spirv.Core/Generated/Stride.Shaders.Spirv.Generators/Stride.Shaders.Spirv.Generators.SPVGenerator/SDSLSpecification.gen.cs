@@ -195,6 +195,20 @@ public static partial class Specification
         MemberNameResolved = 4,
     }
 
+    public enum StreamsKindSDSL
+    {
+        Input = 1,
+        Streams = 2,
+        Output = 3,
+    }
+
+    public enum GeometryStreamOutputKindSDSL
+    {
+        Point = 1,
+        Line = 2,
+        Triangle = 3,
+    }
+
     public enum ExecutionModel
     {
         Mixin = 5367,
